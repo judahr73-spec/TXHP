@@ -53,7 +53,7 @@ class TrooperApp(discord.ui.Modal, title='State Trooper Application'):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        channel = interaction.guild.get_channel(APP_LOG_ID)
+        channel = interaction.guild.get_channel(1470623564561387581)
         if not channel:
             return await interaction.response.send_message("Error: App Log Channel not found.", ephemeral=True)
 
