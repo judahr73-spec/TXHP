@@ -12,8 +12,8 @@ load_dotenv()
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 # We convert these to integers because Discord IDs are numbers
-APP_LOG_ID = int(os.getenv('APP_LOG_ID', 0))
-MOD_LOG_ID = int(os.getenv('MOD_LOG_ID', 0))
+APP_LOG_ID = int(os.getenv('1470623564561387581', 0))
+MOD_LOG_ID = int(os.getenv('1470624139911102689', 0))
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
