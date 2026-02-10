@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-APP_LOG_ID = int(os.getenv('APP_LOG_ID', 0))
-MOD_LOG_ID = int(os.getenv('MOD_LOG_ID', 0))
+APP_LOG_ID = int(os.getenv('1470623564561387581', 0))
+MOD_LOG_ID = int(os.getenv('1470624139911102689', 0))
 
 # PASTE YOUR TEXAS DPS BANNER LINK HERE
 # Suggestion: A Texas flag or a DPS Patrol Car image
