@@ -8,11 +8,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-APP_LOG_ID = int(os.getenv('1470623564561387581', 0))
-MOD_LOG_ID = int(os.getenv('1470624139911102689', 0))
+APP_LOG_ID = int(os.getenv('APP_LOG_ID', 0))
+MOD_LOG_ID = int(os.getenv('MOD_LOG_ID', 0))
 
-# PASTE YOUR TEXAS DPS BANNER LINK HERE
-# Suggestion: A Texas flag or a DPS Patrol Car image
 BANNER_URL = "https://your-image-link-here.com/texas_dps.png"
 
 class MyBot(commands.Bot):
@@ -26,7 +24,7 @@ class MyBot(commands.Bot):
 
 bot = MyBot()
 
-# --- SYNC COMMAND (Run !sync in Discord) ---
+# --- SYNC COMMAND ---
 @bot.command()
 @commands.is_owner()
 async def sync(ctx):
@@ -47,7 +45,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-# --- APPLICATION VIEWS ---
+# --- VIEWS & MODALS ---
 class AdminActions(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -75,7 +73,10 @@ class TrooperApp(discord.ui.Modal, title='Texas State Trooper Application'):
 
     async def on_submit(self, interaction: discord.Interaction):
         channel = bot.get_channel(APP_LOG_ID)
-        embed = discord.Embed(title="⭐️ New Texas Trooper Application", color=discord.Color.from_rgb(0, 40, 104)) # Texas Blue
+        if not channel:
+            return await interaction.response.send_message("❌ Error: Application log channel not found. Tell an Admin to check the ID!", ephemeral=True)
+            
+        embed = discord.Embed(title="⭐️ New Texas Trooper Application", color=discord.Color.from_rgb(0, 40, 104))
         embed.add_field(name="Applicant", value=interaction.user.mention)
         embed.add_field(name="Identity", value=self.name.value)
         embed.add_field(name="Reasoning", value=self.reason.value, inline=False)
@@ -89,7 +90,7 @@ class AppButtonView(discord.ui.View):
     async def apply(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TrooperApp())
 
-# --- SHIFT MANAGEMENT ---
+# --- SHIFT MANAGEMENT & LEADERBOARD ---
 @bot.tree.command(name="on_duty", description="Clock in for your Texas DPS patrol")
 async def on_duty(interaction: discord.Interaction):
     conn = sqlite3.connect('justice.db')
@@ -102,7 +103,7 @@ async def on_duty(interaction: discord.Interaction):
     c.execute("INSERT INTO shifts (user_id, start_time) VALUES (?, ?)", (interaction.user.id, datetime.now()))
     conn.commit()
     conn.close()
-    await interaction.response.send_message(f"🌵 **10-8** | {interaction.user.mention} is now **ON PATROL** (Texas DPS).", ephemeral=False)
+    await interaction.response.send_message(f"🌵 **10-8** | {interaction.user.mention} is now **ON PATROL**.", ephemeral=False)
 
 @bot.tree.command(name="off_duty", description="Clock out from your Texas DPS patrol")
 async def off_duty(interaction: discord.Interaction):
@@ -117,22 +118,54 @@ async def off_duty(interaction: discord.Interaction):
     
     shift_id, start_time_str = result
     end_time = datetime.now()
-    start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S.%f')
+    # Handle both time formats to prevent errors
+    try:
+        start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S.%f')
+    except:
+        start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
     
     duration = end_time - start_time
-    hours, remainder = divmod(duration.seconds, 3600)
-    minutes, _ = divmod(remainder, 60)
-    
     c.execute("UPDATE shifts SET end_time = ? WHERE id = ?", (end_time, shift_id))
     conn.commit()
     conn.close()
     
-    await interaction.response.send_message(
-        f"⭐️ **10-42** | {interaction.user.mention} has finished their patrol.\n**Shift Time:** {hours}h {minutes}m", 
-        ephemeral=False
-    )
+    hours, remainder = divmod(duration.seconds, 3600)
+    minutes, _ = divmod(remainder, 60)
+    await interaction.response.send_message(f"⭐️ **10-42** | {interaction.user.mention} finished patrol. **Time:** {hours}h {minutes}m", ephemeral=False)
 
-# --- RECRUITMENT ---
+@bot.tree.command(name="leaderboard", description="View the top troopers by patrol hours")
+async def leaderboard(interaction: discord.Interaction):
+    conn = sqlite3.connect('justice.db')
+    c = conn.cursor()
+    # This sums up the total time for each user
+    c.execute("SELECT user_id, SUM(strftime('%s', end_time) - strftime('%s', start_time)) as total FROM shifts WHERE end_time IS NOT NULL GROUP BY user_id ORDER BY total DESC LIMIT 10")
+    rows = c.fetchall()
+    conn.close()
+
+    if not rows:
+        return await interaction.response.send_message("No patrol data recorded yet!", ephemeral=True)
+
+    lb_text = ""
+    for i, row in enumerate(rows, 1):
+        user = bot.get_user(row[0]) or f"Unknown Trooper ({row[0]})"
+        total_seconds = row[1]
+        hours = total_seconds // 3600
+        lb_text += f"**{i}.** {user} - `{hours} Hours` \n"
+
+    embed = discord.Embed(title="⭐️ Texas DPS Patrol Leaderboard", description=lb_text, color=discord.Color.gold())
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="reset_hours", description="ADMIN ONLY: Reset all patrol hours")
+@app_commands.checks.has_permissions(administrator=True)
+async def reset_hours(interaction: discord.Interaction):
+    conn = sqlite3.connect('justice.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM shifts")
+    conn.commit()
+    conn.close()
+    await interaction.response.send_message("🚨 All patrol hours have been reset for the new month.", ephemeral=True)
+
+# --- RECRUITMENT & START ---
 @bot.event
 async def on_ready():
     init_db()
@@ -141,27 +174,9 @@ async def on_ready():
 @bot.tree.command(name="setup_apply", description="Send the Texas DPS recruitment button")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_apply(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="Texas Department of Public Safety", 
-        description="**Courage, Service, Integrity.**\nJoin the elite ranks of the Texas State Troopers. Click below to begin your application.", 
-        color=discord.Color.from_rgb(191, 10, 48) # Texas Red
-    )
+    embed = discord.Embed(title="Texas Department of Public Safety", description="**Courage, Service, Integrity.**\nClick below to begin your application.", color=discord.Color.from_rgb(191, 10, 48))
     embed.set_image(url=BANNER_URL) 
     await interaction.channel.send(embed=embed, view=AppButtonView())
-    await interaction.response.send_message("Texas DPS Recruitment post created.", ephemeral=True)
-
-# --- MODERATION ---
-@bot.tree.command(name="infract", description="Log a disciplinary action")
-async def infract(interaction: discord.Interaction, member: discord.Member, reason: str):
-    conn = sqlite3.connect('justice.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO infractions (user_id, mod_id, reason) VALUES (?, ?, ?)", (member.id, interaction.user.id, reason))
-    conn.commit()
-    conn.close()
-    
-    log_chan = bot.get_channel(MOD_LOG_ID)
-    if log_chan:
-        await log_chan.send(f"⚖️ **Citation** | {member.mention} cited by {interaction.user.mention}: {reason}")
-    await interaction.response.send_message(f"Disciplinary record updated for {member.display_name}.", ephemeral=True)
+    await interaction.response.send_message("Recruitment post created.", ephemeral=True)
 
 bot.run(TOKEN)
