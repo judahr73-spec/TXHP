@@ -11,7 +11,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 APP_LOG_ID = int(os.getenv('APP_LOG_ID', 0))
 MOD_LOG_ID = int(os.getenv('MOD_LOG_ID', 0))
 
-BANNER_URL = "https://news4sanantonio.com/resources/media/a77ca87a-ce8a-40d7-9559-86866199fd71-VH1_DPSENTERSICEAGREEMENT.transfer_frame_1965.jpeg"
+BANNER_URL = "https://i.ytimg.com/vi/KPOCXUSUKHY/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLBFnzt0x0bFcCqGr0ZebXJ6s_JwdQ"
 class MyBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.all()
